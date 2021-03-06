@@ -1,4 +1,3 @@
-import dolfin as df
 import numpy as np
 
 
@@ -48,7 +47,7 @@ def line_circleArc(ref, target, f=lambda x: x, orientation=0):
         return center + np.dot(R(t), a - center)
 
     return mapping
-    
+
 # --------------------------------------------------------------------
 
 if __name__ == '__main__':
