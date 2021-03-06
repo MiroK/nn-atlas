@@ -6,7 +6,7 @@
 - [ ] time*
 
 # Domains (with mapping from reference)
-- [ ] Square with cup
+- [ ] Square with cusp
 - [ ] Circle with cusp (parametrized such that we recover smooth)
 - [ ] Cake
 
@@ -21,3 +21,6 @@
 - [ ] Convolution in a disk
 
 # Visualization
+
+determinant
+with cross product

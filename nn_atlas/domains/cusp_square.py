@@ -1,6 +1,6 @@
 from nn_atlas.domains.utils import line_line, line_circleArc
 from nn_atlas.domains.gmsh_interopt import *
-from nn_atlas.domains import ParametrizedDomain
+from nn_atlas.domains.parametrized_domain import ParametrizedDomain
 import numpy as np
 import gmsh
 
@@ -332,3 +332,14 @@ if __name__ == '__main__':
                                     boundaries=rmesh_boundaries,
                                     tags=(1, 2, 3, 4, 5),
                                     mode='displacement')
+
+    for tag in (1, 2, 3, 4, 5):
+        f = domain.ref2def_bdry_deformation(tag)
+
+        tag_facets, = np.where(rmesh_boundaries.array() == tag)
+        reference_x = X[np.unique(np.hstack([Xe2v(e) for e in tag_facets]))]
+        idx = np.argsort(reference_x[:, 0])
+        reference_x = reference_x[idx]
+
+        for xi in reference_x:
+            assert np.linalg.norm(xi + bc_map(xi) - f(xi)) < 1E-15
