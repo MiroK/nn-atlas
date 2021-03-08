@@ -66,6 +66,15 @@ def get_J(grad_phi):
                              nout=1)
 
 
+def topological_edges(cells):
+    '''If each row in cell is a simplex here are the edges'''
+    cells = cells.T
+    # Just as indices
+    edges = [np.c_[cells[i], cells[0]] for i in range(1, len(cells))]
+    
+    return edges
+
+
 def get_J_simplex(phi, x_points, cells):
     '''Compute the determinant as the ratio of dv/dV'''
     # Typical use case is x_points = mesh.coordinates() and cells = mesh.cells()
@@ -73,11 +82,12 @@ def get_J_simplex(phi, x_points, cells):
     # FIXME: I only need it in 2d now
     y = np.array([phi(x) for x in x_points])
     # Here each for in cells defines a simplex
-    cells = cells.T
-    # Just as indices
-    edges = [np.c_[cells[i], cells[0]] for i in range(1, len(cells))]
+    edges = topological_edges(cells)
     # Displacement vectors before ...
     x_disp = [np.diff(x[e], axis=1).squeeze(1) for e in edges]
+    #  A
+    #  |
+    #  C----B
     # ... after
     y_disp = [np.diff(y[e], axis=1).squeeze(1) for e in edges]
 

@@ -6,7 +6,8 @@ import itertools
 
 from nn_atlas.domains.cusp_square import CuspSquare
 from nn_atlas.domains.utils import mesh_interior_points
-from nn_atlas.nn_extensions.calculus import grad
+from nn_atlas.nn_extensions.calculus import grad, diff, cross
+from nn_atlas.analysis import topological_edges
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,15 +30,23 @@ class DeformationNetwork(nn.Module):
         y = torch.tanh(y)
         y = self.lin3(y)
         y = torch.tanh(y)        
-        y = self.lin4(y)
-        # Final deformation
-        return x + y
+        y = self.lin4(y)  # Final deformation
 
-phi = DeformationNetwork()
-phi.double()
+        bdry_mask = (x[..., 0]-0)*(x[..., 0]-1)*(x[..., 1]-(-1))
+        bdry_mask = bdry_mask.unsqueeze(2)
+        # Here we are enforcing dirichlet on the |_| boundaries which are
+        # simple
+        # FIXME: In case of cusp square we could also use x[..., 0] as
+        # a parametrization of the arc and compute the displacement?
+        return y*bdry_mask
+
+u = DeformationNetwork()
+u.double()
+
+phi = lambda x: x + u(x)
 
 # Let's get the training set
-d = 0.9
+d = 0.916
 R1 = 1/d
 domain = CuspSquare(d=d, R1=R1)
 
@@ -45,21 +54,33 @@ domain = CuspSquare(d=d, R1=R1)
 t = np.linspace(0, 1, 100)
 bdry_ref, bdry_target = domain.ref_target_pairs(t)
 
+bdry_ref, bdry_target = np.row_stack(bdry_ref), np.row_stack(bdry_target)
 # On the interior we "just" want some regularity from the extension map
-# For now we will take points from the mesh
+# For now we will take points from the mesh but they really could be random.
+# However, these points could be random. Then, for the simplex determinant
+# we could take combinations of len 3 or Delaunay triangulation
 mesh, _ = domain.get_reference_mesh(resolution=0.5)
 
-interior_ref = mesh_interior_points(mesh)
+interior_ref = mesh.coordinates()
+
+edges_idx = topological_edges(mesh.cells())
+edges_idx = [np.fromiter(e.flat, dtype='int32').reshape(e.shape) for e in edges_idx]
 
 bdry_ref, bdry_target, interior_ref = (torch.tensor([array], dtype=torch.float64)
                                        for array in (bdry_ref, bdry_target, interior_ref))
 
+# For simplex determinant we can precompute reference element sizes
+# (A-B-C) ->  (B-A, C-A)
+arrows = [diff(interior_ref[0, edge], axis=1).squeeze(1) for
+          edge in edges_idx]
+sizes_ref = cross(*arrows)  # There is a constant scaling missing but eh
+
 maxiter = 1000
-optimizer = optim.LBFGS(phi.parameters(), max_iter=maxiter,
-                        history_size=1000, tolerance_change=1e-12,
+optimizer = optim.LBFGS(u.parameters(), max_iter=maxiter,
+                        history_size=1000, tolerance_change=1e-8,
                         line_search_fn="strong_wolfe")
 
-interior_ref.requires_grad = True
+
 
 epoch_loss = []
 def closure(history=epoch_loss):
@@ -70,13 +91,23 @@ def closure(history=epoch_loss):
     bdry_loss = ((bdry_target - f_x)**2).mean()
 
     # Refularize
-    J = torch.det(grad(phi(interior_ref), interior_ref))
-    penalty_J = torch.tensor(1E-5, dtype=torch.float64)
+    penalty_J = torch.tensor(1E-4, dtype=torch.float64)    
+    # Local determinant
+    # J = torch.det(grad(phi(interior_ref), interior_ref))
+
+    # Mesh based determinant
+    y = phi(interior_ref)
+ 
+    arrows = [diff(y[0, edge], axis=1).squeeze(1) for
+              edge in edges_idx]
+    sizes_target = cross(*arrows)  # There is a constant scaling missing but eh
+
+    J = sizes_target/sizes_ref
     
     loss = (bdry_loss
-            +penalty_J*torch.mean(1/J**2)
+            + penalty_J*torch.mean(1/J**2)
             )
-    print(f'Loss = {float(loss)}')
+    print(f'{len(history)} => Loss = {float(loss)} {float(J.min())}')
     loss.backward()
 
     history.append((float(loss), ))
@@ -100,9 +131,6 @@ print('Done')
 x_ref = torch.tensor([mesh.coordinates()])
 # NOTE: Paraview's warp by vector is based on displacement
 displacement_values = phi(x_ref) - x_ref
-
-#xmid_hat = torch.tensor([cell_midpoints(mesh)], requires_grad=True)
-#detF_values = torch.det(grad(phi(xmid_hat), xmid_hat))
 
 import meshio
 

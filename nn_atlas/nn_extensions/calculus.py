@@ -89,3 +89,22 @@ def outer(u, v):
     assert ncomps > 1
 
     return u.unsqueeze(3)*v.unsqueeze(2)
+
+
+def cross(u, v):
+    '''2 and 3 dim cross product'''
+    try:
+        return torch.cross(u, v)
+    except RuntimeError:
+        return u[..., 0]*v[..., 1] - u[..., 1]*v[..., 0]
+
+
+def diff(u, axis):
+    '''np.diff(u, axis=axis, n=1) - like'''
+    shape = u.shape
+    assert 0 <= axis < len(shape)
+
+    plus = tuple(slice(1, s) if i == axis else slice(s) for i, s in enumerate(shape))
+    minus = tuple(slice(0, s-1) if i == axis else slice(s) for i, s in enumerate(shape))
+
+    return u[plus] - u[minus]

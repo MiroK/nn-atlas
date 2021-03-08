@@ -10,7 +10,7 @@
 - [ ] Circle with cusp (parametrized such that we recover smooth)
 - [ ] Cake
 
-# Networks (with reg loss, as autoencoder)
+# Networks (with reg loss, as **autoencoder**)
 - [ ] FFFF
 - [ ] CNN?
 - [ ] ResNet
@@ -22,7 +22,9 @@
 - [ ] Circle <-> disc
 - [ ] Convolution in a disk
 
-# Visualization
+# Analysis/Visualization
+- [ ] Sparse regression of the network to see if we can find a PDE it solved
 
-determinant
-with cross product
+# Ultimate
+- [ ] Something like operator network (reference, bdry) --> NN(x_ref) that
+      is the extension network
