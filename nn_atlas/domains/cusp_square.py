@@ -25,6 +25,8 @@ class CuspSquare(ParametrizedDomain):
         self.R1 = R1
         self.R2 = R1 if R2 is None else R2
 
+        self._tags = (1, 2, 3, 4, 5)
+
     def get_reference_mesh(self, *, structured=False, uniform=False, resolution=1.):
         '''Build the reference mesh'''
         d, R1, R2 = self.d, self.R1, self.R2
@@ -277,6 +279,25 @@ class CuspSquare(ParametrizedDomain):
 
             return line_circleArc(ref=np.array([[0.5, 0.], [1.0, 0]]),
                                   target=np.array([[0.5, d], center, [1.0, 0]]))
+
+    def ref_bdry_points(self, parameters, tag):
+        '''Refeference domain boundary points based on their parametric coordinates'''
+        #  ->1>-2-
+        #  5     v
+        #  ^     3
+        #  --4-<-
+        points = {1: np.array([[0, 0.], [0.5, 0]]),
+                  2: np.array([[0.5, 0.], [1.0, 0]]),
+                  3: np.array([[1.0, 0.], [1.0, -1.0]]),
+                  4: np.array([[1.0, -1.0], [0, -1.0]]),
+                  5: np.array([[0, -1.0], [0., 0.]])}
+
+        if not len(parameters.shape) == 2:
+            parameters = parameters.reshape((-1, 1))
+        
+        A, B = points[tag]
+
+        return A + (B-A)*parameters
 
 # --------------------------------------------------------------------
 

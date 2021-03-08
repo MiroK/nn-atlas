@@ -1,4 +1,5 @@
 import dolfin as df
+import numpy as np
 
 
 class ParametrizedDomain(object):
@@ -26,6 +27,34 @@ class ParametrizedDomain(object):
         # is mapped to y_ref(param), i.e. we use the same parameter
         # value
         raise NotImplemented
+
+    @property
+    def tags(self):
+        return self._tags
+
+    def ref_bdry_points(self, parameters, tag):
+        '''Refeference domain boundary points based on their parametric coordinates'''
+        # NOTE: paremtrization in general is assumed to be [0, 1]-based
+        raise NotImplemented
+
+    def ref_target_pairs(self, parameters, tag=None):
+        '''Reference point and its image by deformation'''
+        if tag is None:
+            tag = self.tags
+        elif isinstance(tag, int):
+            tag = (tag, )
+
+        all_x, all_y = [], []
+        for t in tag:
+            x = self.ref_bdry_points(parameters, t)
+
+            f = self.ref2def_bdry_deformation(t)
+            y = np.array([f(xi) for xi in x])
+
+            all_x.append(x)
+            all_y.append(y)
+
+        return all_x, all_y
 
     def set_mapping_bcs(self, Velm, boundaries, tags, mode):
         '''

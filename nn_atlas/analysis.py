@@ -2,14 +2,23 @@ from dolfin import *
 import numpy as np
 
 
-def deformation_gradient(phi, mesh, is_displacement=True):
-    '''Deformation gradient (in its natural space) on mesh'''
-    T = TensorFunctionSpace(mesh, 'DG', phi.function_space().ufl_element().degree()-1)
+def deformation_gradient(phi, mesh=None, is_displacement=True, deg_decrement=0):
+    '''Deformation gradient on mesh'''
+    assert deg_decrement >= 0
+
+    if mesh is None:
+        mesh = phi.function_space().mesh()
+    
+    T = TensorFunctionSpace(mesh,
+                            'DG',
+                            phi.function_space().ufl_element().degree()-deg_decrement)
     
     if is_displacement:
-        return project(Identity(len(phi)) + grad(phi), T)
-
-    return project(grad(phi), T)
+        form = Identity(len(phi)) + grad(phi)
+    else:
+        form = grad(phi)
+        
+    return project(form, T)
 
 
 def build_dg_function(v, transform, nout):
@@ -48,34 +57,102 @@ def build_dg_function(v, transform, nout):
 def get_J(grad_phi):
     '''deteminant(grad_phi) field'''
     n, m = grad_phi.value_shape()
+    assert n == m
     
     value_from_dofs = lambda x, n=n: (np.linalg.det(x.reshape((n, n))), )
+    
     return build_dg_function(grad_phi,
                              transform=value_from_dofs,
                              nout=1)
 
 
-# def get_lambdas(grad_phi):
-#     '''Fields of eigenvalues'''
-#     n = len(grad_phi)
-#     value_from_dofs = lambda x, n=n: np.linalg.det(x.reshape((n, n)))
-#     return build_dg_function(grad_phi,
-#                              transform=value_from_dofs,
-#                              nout=n)
+def get_J_simplex(phi, x_points, cells):
+    '''Compute the determinant as the ratio of dv/dV'''
+    # Typical use case is x_points = mesh.coordinates() and cells = mesh.cells()
+    
+    # FIXME: I only need it in 2d now
+    y = np.array([phi(x) for x in x_points])
+    # Here each for in cells defines a simplex
+    cells = cells.T
+    # Just as indices
+    edges = [np.c_[cells[i], cells[0]] for i in range(1, len(cells))]
+    # Displacement vectors before ...
+    x_disp = [np.diff(x[e], axis=1).squeeze(1) for e in edges]
+    # ... after
+    y_disp = [np.diff(y[e], axis=1).squeeze(1) for e in edges]
+
+    dVs = np.cross(*x_disp)
+    dvs = np.cross(*y_disp)
+
+    return dvs/dVs  # Can still be negative
+
+
+def get_lambdas(grad_phi):
+    '''Fields of eigenvalues'''
+    n, m = grad_phi.value_shape()
+    assert n == m
+    
+    def value_from_dofs(x, n=n, tol=1E-10):
+        eigvals = np.linalg.eigvals(x.reshape((n, n)))
+        assert np.linalg.norm(eigvals.imag) < tol
+
+        return np.sort(eigvals.real)
+
+    return build_dg_function(grad_phi,
+                             transform=value_from_dofs,
+                             nout=n)
 
 # --------------------------------------------------------------------
 
 if __name__ == '__main__':
+    import sympy as sp
+    import ufl
+    
+    x, y = sp.symbols('x[0] x[1]')
+    # Deformation is Identity + displacement
+    f0 = sp.Matrix([x, y]) + sp.Matrix([x**2 + x, 2*y**2 - y])
+    # f0 = sp.Matrix([x+y, 2*y])    
+    grad_f0 = sp.Matrix([[f0[0].diff(x, 1), f0[0].diff(y, 1)],
+                         [f0[1].diff(x, 1), f0[1].diff(y, 1)]])
 
-    mesh = UnitSquareMesh(5, 5)
+    J0 = Expression(sp.printing.ccode(sp.det(grad_f0)), degree=4)
+    
+    mesh = UnitSquareMesh(10, 10)
     V = VectorFunctionSpace(mesh, 'CG', 2)
 
-    f = interpolate(Expression(('x[0]', '2*x[1]'), degree=1), V)
+    f = interpolate(Expression((sp.printing.ccode(f0[0]),
+                                sp.printing.ccode(f0[1])), degree=2), V)
 
     grad_f = deformation_gradient(f, mesh=mesh, is_displacement=False)
+
+    xx = Expression(((sp.printing.ccode(grad_f0[0, 0]), sp.printing.ccode(grad_f0[0, 1])),
+                     (sp.printing.ccode(grad_f0[1, 0]), sp.printing.ccode(grad_f0[1, 1]))),
+                    degree=2)
+    eJ = assemble(inner(grad_f - xx, grad_f - xx)*dx)
+    print(eJ)
+
+    
     J, = get_J(grad_f)
 
-    print(J.vector().get_local())
+    eJ = assemble(inner(J - J0, J - J0)*dx)
+    print(eJ)  # NOTE: determinant is essentially a polynomial so we want
+               # exactness ...
+
+    # ----------
+
+    eig0, eig1 = (Expression(sp.printing.ccode(expr), degree=4)
+                  for expr in grad_f0.eigenvals().keys())
+
+    eig_min0 = ufl.Min(abs(eig0), abs(eig1))
+    eig_max0 = ufl.Max(abs(eig0), abs(eig1))    
+    
+    eig_min, eig_max = get_lambdas(grad_f)
+
+    # ... on the other hand eigenvalues are roots of a polynomial so
+    # we settle for mosh convergence of the error
+    print(assemble(inner(eig_min - eig_min0, eig_min - eig_min0)*dx))
+    print(assemble(inner(eig_max - eig_max0, eig_max - eig_max0)*dx))    
+
 
 # TODO: 
 #  - test analysis functionality
