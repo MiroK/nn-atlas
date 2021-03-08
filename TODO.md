@@ -28,3 +28,4 @@
 # Ultimate
 - [ ] Something like operator network (reference, bdry) --> NN(x_ref) that
       is the extension network
+- [ ] Learn the mapping piecewise and blend it
