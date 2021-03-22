@@ -93,8 +93,8 @@ class CuspSquare(ParametrizedDomain):
                 model.mesh.field.setNumber(2, 'InField', 1)        
                 model.mesh.field.setNumber(2, 'SizeMax', 0.1)
                 model.mesh.field.setNumber(2, 'SizeMin', 0.01)
-                model.mesh.field.setNumber(2, 'DistMin', 0.1)
-                model.mesh.field.setNumber(2, 'DistMax', 0.2)    
+                model.mesh.field.setNumber(2, 'DistMin', 0.025)
+                model.mesh.field.setNumber(2, 'DistMax', 0.1)    
                 
                 model.mesh.field.setAsBackgroundMesh(2)
                 
@@ -364,3 +364,10 @@ if __name__ == '__main__':
 
         for xi in reference_x:
             assert np.linalg.norm(xi + bc_map(xi) - f(xi)) < 1E-15
+
+
+
+# 
+# t (0, 1)
+#
+# A -X-- B    A + (B-A)*(t) in (0, 1)

@@ -13,7 +13,7 @@
 # Networks (with reg loss, as **autoencoder**)
 - [ ] FFFF
 - [ ] CNN?
-- [ ] ResNet
+- [ ] ResNet   
 - [ ] determinant constraint vs mesh based cross product
 - [ ] hard bcs vs in loss
 
