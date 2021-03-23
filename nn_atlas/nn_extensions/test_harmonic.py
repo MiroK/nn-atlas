@@ -8,6 +8,7 @@ from nn_atlas.domains.cusp_square import CuspSquare
 from nn_atlas.domains.utils import mesh_interior_points
 from nn_atlas.nn_extensions.calculus import grad, diff, cross
 from nn_atlas.nn_extensions.p1net import VectorP1FunctionSpace
+from nn_atlas.nn_extensions.quadrature import get_volume_quadrature_mesh
 from nn_atlas.analysis import topological_edges
 
 import matplotlib.pyplot as plt
@@ -39,7 +40,7 @@ def HarmonicExtension(domain, *, structured=False, resolution=0.5):
     df.solve(a == L, uh, bcs)
 
     # Now for pytorch
-    he = VectorP1FunctionSpace(rmesh)
+    he = VectorP1FunctionSpace(rmesh, invalidate_cache=False)
     # Set the network to represent uh
     he.set_from_coefficients(uh.vector().get_local())
 
@@ -79,6 +80,7 @@ class DisplacementNetwork(nn.Module):
         bdry_mask = bdry_mask.unsqueeze(2)
 
         he = self.harmonic_extension(x)
+
         # y*bdry_mask is zero on boundary, the right bcs are due to he
         return y*bdry_mask + he
 
@@ -87,7 +89,7 @@ d = 0.910
 R1 = 1/d
 domain = CuspSquare(d=d, R1=R1)
 
-u = DisplacementNetwork(domain)
+u = DisplacementNetwork(domain, resolution=0.5)
 u.double()
 
 phi = lambda x: x + u(x)
@@ -96,17 +98,21 @@ phi = lambda x: x + u(x)
 # NOTE: u.paremeters() would include harmonic_extension layer
 parameters = itertools.chain(*[l.parameters() for l in (u.lin1, u.lin2, u.lin3, u.lin4)])
 
-mesh, _ = domain.get_reference_mesh(resolution=0.5)
+mesh, entity_functions = domain.get_reference_mesh(resolution=0.5)
+volume_subdomains = entity_functions[2]
 # FIXME: random sample/Sobol sequences/midpoints?
-interior_ref = mesh.coordinates()
-interior_ref = torch.tensor([interior_ref], dtype=torch.float64)
+mesh_vertices = mesh.coordinates()
+mesh_vertices = torch.tensor([mesh_vertices], dtype=torch.float64)
+# mesh_vertices.requires_grad = True  # NOTE: for local determinant
+
+# interior_ref, wq = get_volume_quadrature_mesh(volume_subdomains, degree=1, subdomain=-1)
 
 edges_idx = topological_edges(mesh.cells())
 edges_idx = [np.fromiter(e.flat, dtype='int32').reshape(e.shape) for e in edges_idx]
 
 # For simplex determinant we can precompute reference element sizes
 # (A-B-C) ->  (B-A, C-A)
-arrows = [diff(interior_ref[0, edge], axis=1).squeeze(1) for
+arrows = [diff(mesh_vertices[0, edge], axis=1).squeeze(1) for
           edge in edges_idx]
 sizes_ref = cross(*arrows)  # There is a constant scaling missing but eh
 
@@ -119,11 +125,12 @@ epoch_loss = []
 def closure(history=epoch_loss):
     optimizer.zero_grad()
 
+    # FIXME: this one
     # Local determinant
     # J = torch.det(grad(phi(interior_ref), interior_ref))
 
     # Mesh based determinant
-    y = phi(interior_ref)
+    y = phi(mesh_vertices)
  
     arrows = [diff(y[0, edge], axis=1).squeeze(1) for
               edge in edges_idx]
@@ -131,8 +138,8 @@ def closure(history=epoch_loss):
 
     J = sizes_target/sizes_ref
     
-    loss = torch.mean(1/J**2)
-    print(f'{len(history)} => Loss = {float(loss)} {float(torch.abs(J).min())}')
+    loss = torch.mean(1/J**2) + torch.mean(J**2)
+    print(f'{len(history)} => Loss = {float(loss)} {float(torch.abs(J).min())} {float(torch.abs(J).max())}')
     loss.backward()
 
     history.append((float(loss), ))
@@ -157,7 +164,7 @@ extensions = {'nn': phi,
 
 for key in extensions:
     # Grab method
-    y = extensions[key](interior_ref)
+    y = extensions[key](mesh_vertices)
  
     arrows = [diff(y[0, edge], axis=1).squeeze(1) for
               edge in edges_idx]
@@ -189,3 +196,7 @@ mesh_io.write('test_nn_extension.vtk')
 # FIXME: cleanup
 #        what is the final quality - determinant as cell function
 #        train on local mapped stiffness matrix?
+#        ctrl+z progress?
+#        local determinant - need to implement Harmonic extension as
+#        L^2 loss functions with quadrature
+#        function https://pytorch.org/docs/stable/notes/extending.html

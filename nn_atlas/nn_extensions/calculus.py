@@ -23,14 +23,14 @@ def div(u, x, retain_graph=True, create_graph=True):
     # This is a 1d case for scalar
     if len(x.shape) == 2:
         assert len(u.shape) == 2
-        return grad(u, x)
+        return grad(u, x, retain_graph=retain_graph, create_graph=create_graph)
 
     # Vector:
     # u_i/x_i
     if len(u.shape) == 3:
         div_u = torch.zeros(u.shape[:-1], dtype=u.dtype)
         for i in range(u.shape[-1]):
-            div_u = div_u + grad(u[..., i], x)[..., i]
+            div_u = div_u + grad(u[..., i], x, retain_graph=retain_graph, create_graph=create_graph)[..., i]
         return div_u
 
     # Matrix
@@ -38,7 +38,8 @@ def div(u, x, retain_graph=True, create_graph=True):
     n, m = u.shape[2:]
     assert n == m
     # div(u_i[:])
-    return torch.stack([div(u[..., i, :], x) for i in range(n)], axis=2)
+    return torch.stack([div(u[..., i, :], x, retain_graph=retain_graph, create_graph=create_graph)
+                        for i in range(n)], axis=2)
     
 
 def trace(tensor):

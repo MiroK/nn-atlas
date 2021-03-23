@@ -75,7 +75,7 @@ def hat_function(x, support):
 
 class VectorP1FunctionSpace(nn.Module):
     '''Neural net that is ['CG1']^2 function space on mesh'''    
-    def __init__(self, mesh):
+    def __init__(self, mesh, invalidate_cache=True):
         assert mesh.geometry().dim() == 2 and mesh.topology().dim() == 2
         
         super().__init__()
@@ -86,6 +86,7 @@ class VectorP1FunctionSpace(nn.Module):
         
         self.supports = hat_supports(mesh)
         self.basis_cache = None
+        self.invalidate_cache = invalidate_cache
 
         V = df.VectorFunctionSpace(mesh, 'CG', 1)
         self.dofs_x = V.sub(0).dofmap().dofs()
@@ -106,7 +107,11 @@ class VectorP1FunctionSpace(nn.Module):
         x_component = self.lin_x(self.basis_cache).squeeze(2)
         y_component = self.lin_y(self.basis_cache).squeeze(2)
 
-        return torch.stack([x_component, y_component], axis=2)
+        out = torch.stack([x_component, y_component], axis=2)
+
+        self.invalidate_cache and setattr(self, 'basis_cache', None)
+
+        return out
 
     def set_from_coefficients(self, coefs):
         '''Set the degrees of freedom'''
@@ -117,14 +122,16 @@ class VectorP1FunctionSpace(nn.Module):
 
 class ScalarP1FunctionSpace(nn.Module):
     '''Neural net that is 'CG1' function space on mesh'''
-    def __init__(self, mesh):
+    def __init__(self, mesh, invalidate_cache=True):
         assert mesh.geometry().dim() == 2 and mesh.topology().dim() == 2
         super().__init__()
         # The weights are coefficients that combine the basis functions
         self.lin = nn.Linear(mesh.num_vertices(), 1, bias=False)
         self.ndofs = mesh.num_vertices()
         self.supports = hat_supports(mesh)
+
         self.basis_cache = None
+        self.invalidate_cache = invalidate_cache
         
     def forward(self, x):
         # Build up "Vandermonde", then each column is what
@@ -133,13 +140,22 @@ class ScalarP1FunctionSpace(nn.Module):
         if self.basis_cache is None:
             bsize, npts  = x.shape[:2]
             basis_values = torch.zeros(bsize, npts, ndofs, dtype=x.dtype)
-
+            
             for col, support in enumerate(self.supports):
                 a = hat_function(x, support)
                 basis_values[..., col] = hat_function(x, support)
             self.basis_cache = basis_values
             
-        return self.lin(self.basis_cache).squeeze(2)
+        out = self.lin(self.basis_cache).squeeze(2)
+
+        #  npts x ndofs
+        # nvecs x npts x ndofs   .  weigths
+        # nvecs x npts <---
+        #
+
+        self.invalidate_cache and setattr(self, 'basis_cache', None)
+
+        return out
 
     def set_from_coefficients(self, coefs):
         '''Set the degrees of freedom'''
@@ -149,6 +165,7 @@ class ScalarP1FunctionSpace(nn.Module):
 # --------------------------------------------------------------------
 
 if __name__ == '__main__':
+    from nn_atlas.nn_extensions.calculus import grad
     
     mesh = df.UnitSquareMesh(10, 10)
     V = df.FunctionSpace(mesh, 'CG', 1)
@@ -156,7 +173,7 @@ if __name__ == '__main__':
     p1 = ScalarP1FunctionSpace(mesh)
     p1.double()
 
-    f = df.Expression('x[0] + x[1]', degree=1)
+    f = df.Expression('x[0] + 3*x[1]', degree=1)
     coef = df.interpolate(f, V).vector().get_local()
     p1.set_from_coefficients(coef)
     
@@ -172,25 +189,31 @@ if __name__ == '__main__':
     true = np.array([f(xi) for xi in x.detach().numpy().reshape(-1, 2)])
     print(np.linalg.norm(mine - true, np.inf))
 
-    # ---
-
-    V = df.VectorFunctionSpace(mesh, 'CG', 1)
+    y = torch.rand(1, 10, 2, dtype=torch.float64)
+    y.requires_grad = True
+    print(grad(p1(y), y))
+    print(grad(p1(y), y))
+    print(grad(p1(y), y))    
     
-    p1 = VectorP1FunctionSpace(mesh)
-    p1.double()
+    # # ---
 
-    f = df.Expression(('x[0] + x[1]', 'x[0] - 2*x[1]'), degree=1)
-    coef = df.interpolate(f, V).vector().get_local()
-    p1.set_from_coefficients(coef)
+    # V = df.VectorFunctionSpace(mesh, 'CG', 1)
     
-    x = torch.rand(1, 10000, 2, dtype=torch.float64)
+    # p1 = VectorP1FunctionSpace(mesh)
+    # p1.double()
 
-    timer = df.Timer('first')
-    mine = p1(x).detach().numpy().flatten()
-    print('Time to first', timer.stop())
+    # f = df.Expression(('x[0] + x[1]', 'x[0] - 2*x[1]'), degree=1)
+    # coef = df.interpolate(f, V).vector().get_local()
+    # p1.set_from_coefficients(coef)
+    
+    # x = torch.rand(1, 10000, 2, dtype=torch.float64)
 
-    timer = df.Timer('second')
-    mine = p1(x).detach().numpy().flatten()    
-    print('Time to second', timer.stop())
-    true = np.array([f(xi) for xi in x.detach().numpy().reshape(-1, 2)]).flatten()
-    print(np.linalg.norm(mine - true, np.inf))
+    # timer = df.Timer('first')
+    # mine = p1(x).detach().numpy().flatten()
+    # print('Time to first', timer.stop())
+
+    # timer = df.Timer('second')
+    # mine = p1(x).detach().numpy().flatten()    
+    # print('Time to second', timer.stop())
+    # true = np.array([f(xi) for xi in x.detach().numpy().reshape(-1, 2)]).flatten()
+    # print(np.linalg.norm(mine - true, np.inf))
