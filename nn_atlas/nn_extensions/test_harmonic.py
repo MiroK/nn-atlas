@@ -85,7 +85,7 @@ class DisplacementNetwork(nn.Module):
         return y*bdry_mask + he
 
 # Let's get the training set
-d = 0.910
+d = 0.916
 R1 = 1/d
 domain = CuspSquare(d=d, R1=R1)
 
@@ -102,10 +102,11 @@ mesh, entity_functions = domain.get_reference_mesh(resolution=0.5)
 volume_subdomains = entity_functions[2]
 # FIXME: random sample/Sobol sequences/midpoints?
 mesh_vertices = mesh.coordinates()
+
 mesh_vertices = torch.tensor([mesh_vertices], dtype=torch.float64)
 # mesh_vertices.requires_grad = True  # NOTE: for local determinant
 
-# interior_ref, wq = get_volume_quadrature_mesh(volume_subdomains, degree=1, subdomain=-1)
+_, wq = get_volume_quadrature_mesh(volume_subdomains, degree=1, subdomain=-1)
 
 edges_idx = topological_edges(mesh.cells())
 edges_idx = [np.fromiter(e.flat, dtype='int32').reshape(e.shape) for e in edges_idx]
@@ -138,7 +139,9 @@ def closure(history=epoch_loss):
 
     J = sizes_target/sizes_ref
     
-    loss = torch.mean(1/J**2) + torch.mean(J**2)
+    # loss = torch.mean(1/J**2 + J**2)
+    loss = torch.sum(wq*(1/J**2 + J**2))  # L^2
+    # loss = torch.sum(wq*(1/J**2)) + torch.sum(wq*J**2)    
     print(f'{len(history)} => Loss = {float(loss)} {float(torch.abs(J).min())} {float(torch.abs(J).max())}')
     loss.backward()
 
@@ -196,6 +199,7 @@ mesh_io.write('test_nn_extension.vtk')
 # FIXME: cleanup
 #        what is the final quality - determinant as cell function
 #        train on local mapped stiffness matrix?
+#        ADM
 #        ctrl+z progress?
 #        local determinant - need to implement Harmonic extension as
 #        L^2 loss functions with quadrature
