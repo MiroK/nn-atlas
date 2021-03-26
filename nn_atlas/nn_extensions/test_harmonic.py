@@ -139,7 +139,7 @@ def closure(history=epoch_loss):
 
     J = sizes_target/sizes_ref
     
-    # loss = torch.mean(1/J**2 + J**2)
+    # loss = torch.mean(1/J**2  + J**2)
     loss = torch.sum(wq*(1/J**2 + J**2))  # L^2
     # loss = torch.sum(wq*(1/J**2)) + torch.sum(wq*J**2)    
     print(f'{len(history)} => Loss = {float(loss)} {float(torch.abs(J).min())} {float(torch.abs(J).max())}')

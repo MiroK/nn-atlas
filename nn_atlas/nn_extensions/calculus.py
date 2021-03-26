@@ -2,6 +2,10 @@ import torch
 import torch.autograd as autograd
 
 
+def logical_and(cond0, cond1):
+    return cond0*cond1
+
+
 def grad(u, x, retain_graph=True, create_graph=True):
     '''Gradient wrt to x where x is [x0, x1, ...]'''
     assert len(x.shape) >= 2
