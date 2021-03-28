@@ -69,6 +69,10 @@ class ScalarP1FunctionSpace(nn.Module):
             out[(inside_bbox[0][inside],
                  inside_bbox[1][inside])] = (1-s-t)*c0 + s*c1 + t*c2
 
+
+            # s = x * Minv
+            # df_dx =  ds/dx * df/ds         [[-c0+c1;-c0 + c2]]
+
         return out
 
     def set_from_coefficients(self, coefs):
@@ -114,3 +118,8 @@ if __name__ == '__main__':
     # du = grad(p1(x), x)
 
     # print(du)
+
+# FIXME: - wire up vector
+#        - say we cache the gradient on forward pass, how to reuse during backward?
+#
+#
