@@ -333,8 +333,8 @@ if __name__ == '__main__':
     true = np.array([f(xi) for xi in x.detach().numpy().reshape(-1, 2)])
     print(np.linalg.norm(mine - true, np.inf))
 
-    x.requires_grad = True
-    du = grad(p1(x), x)
+    # x.requires_grad = True
+    # du = grad(p1(x), x)
     
     # y = torch.rand(1, 10, 2, dtype=torch.float64)
     # y.requires_grad = True
