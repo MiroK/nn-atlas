@@ -2,6 +2,45 @@ import dolfin as df
 import numpy as np
 
 
+def sample_boundary(mesh, npts):
+    '''Points on the boundary of the domain'''
+    return sample_interior(df.BoundaryMesh(mesh, 'exterior'), npts, rtol=0)
+
+
+def sample_interior(mesh, npts, rtol=1E-1):
+    '''Points inside the mesh roughly rtol*mesh_size from the boundary'''
+    gdim = mesh.geometry().dim()
+    cell = mesh.ufl_cell()
+    # For parametrizazation
+    nedges = cell.num_edges()
+    # FIXME: for now we will do only ...
+    assert nedges == 3 or nedges == 1
+
+    x = mesh.coordinates()
+    cells = mesh.cells().T
+    ncells = mesh.num_cells()
+
+    tol = mesh.hmin()*rtol
+    origin = x[cells[0]]
+    if nedges == 3:
+        edges = np.column_stack([x[cells[i]]-origin for i in range(1, nedges)]).reshape((ncells, nedges-1, gdim))
+        cell_idx = np.random.choice(np.arange(ncells), npts)
+        
+        s = tol + (1-tol)*np.random.rand(npts, 1)
+        t = 1 - tol - s
+
+        pts = origin[cell_idx] + edges[cell_idx, 0]*s + edges[cell_idx, 1]*t
+        return pts
+
+    edges = np.array([x[cells[1]]-origin]).reshape((ncells, 1, gdim))
+    cell_idx = np.random.choice(np.arange(ncells), npts)
+    
+    s = tol + (1-tol)*np.random.rand(npts, 1)
+    pts = origin[cell_idx] + edges[cell_idx, 0]*s
+
+    return pts
+
+
 def mesh_interior_points(mesh):
     '''Interior points of the mesh'''
     idx = mesh_intior_points_idx(mesh)
@@ -72,6 +111,21 @@ def line_circleArc(ref, target, f=lambda x: x, orientation=0):
 if __name__ == '__main__':
     import matplotlib.pyplot as plt
 
+    mesh = df.UnitSquareMesh(32, 32)
+
+    pts = sample_interior(df.BoundaryMesh(mesh, 'exterior'), npts=1000)
+    
+    x, y = pts.T
+    #d = np.min(np.c_[x, 1-x, y, 1-y], axis=1)
+    #idx, = np.where(d < 1E-10)
+    #print(np.sort(d)[:10], len(x))
+    #print(s[idx])
+    df.plot(mesh)
+    plt.plot(pts[:, 0], pts[:, 1], marker='x', linestyle='none', markersize=10)
+
+    plt.show()
+
+    exit()
 
     ref = np.array([[0, 0],
                     [0.5, 0]])
