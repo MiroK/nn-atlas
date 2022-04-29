@@ -29,7 +29,7 @@ def elastic_extension(V, boundaries, dirichlet_bcs, neumann_bcs={},
         
     L = inner(Constant((0, )*len(u)), v)*dx
     # Neumann bcs
-    ds = Measure('ds', domain=boundaries.mesh(), subdomain_data=boundaries.mesh())
+    ds = Measure('ds', domain=boundaries.mesh(), subdomain_data=boundaries)
     for tag, value in neumann_bcs.items():
         L += inner(value, v)*ds(tag)
     # Dirichlet ones
@@ -68,7 +68,7 @@ def mixed_elastic_extension(V, boundaries, dirichlet_bcs, neumann_bcs={},
         
     L = inner(Constant((0, )*len(u)), v)*dx
     # Neumann bcs
-    ds = Measure('ds', domain=boundaries.mesh(), subdomain_data=boundaries.mesh())
+    ds = Measure('ds', domain=boundaries.mesh(), subdomain_data=boundaries)
     for tag, value in neumann_bcs.items():
         L += inner(value, v)*ds(tag)
     # Dirichlet ones
