@@ -5,3 +5,6 @@
 *~
 
 *.vtk
+
+/nn_atlas.egg-info
+*.npz

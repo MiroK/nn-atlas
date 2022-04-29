@@ -2,7 +2,7 @@ from nn_atlas.extensions.utils import check_bcs
 from dolfin import *
 
 
-def harmonic_extension(V, boundaries, dirichlet_bcs, neumann_bcs={}, diffusion=Constant(1)):
+def harmonic_extension(V, boundaries, dirichlet_bcs, neumann_bcs={}, diffusion=Constant(1), f=None):
     '''
     Given boundary displacement we extend to the entire domain by solving
 
@@ -16,7 +16,10 @@ def harmonic_extension(V, boundaries, dirichlet_bcs, neumann_bcs={}, diffusion=C
     u, v = TrialFunction(V), TestFunction(V)
     
     a = inner(diffusion*grad(u), grad(v))*dx
-    L = inner(Constant((0, )*len(u)), v)*dx
+    if f is not None:
+        L = inner(f, v)*dx
+    else:
+        L = inner(Constant((0, )*len(u)), v)*dx
     # Neumann bcs
     ds = Measure('ds', domain=boundaries.mesh(), subdomain_data=boundaries)
     for tag, value in neumann_bcs.items():

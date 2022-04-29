@@ -3,7 +3,7 @@ from dolfin import *
 
 
 def elastic_extension(V, boundaries, dirichlet_bcs, neumann_bcs={},
-                      mu=Constant(1), lmbda=Constant(1), sym_grad=False):
+                      mu=Constant(1), lmbda=Constant(1), sym_grad=False, f=None):
     '''
     Given boundary displacement we extend to the entire domain by solving
 
@@ -26,8 +26,11 @@ def elastic_extension(V, boundaries, dirichlet_bcs, neumann_bcs={},
         a = inner(mu*grad(u), grad(v))*dx + lmbda*inner(div(u), div(v))*dx
     else:
         a = inner(2*mu*sym(grad(u)), sym(grad(v)))*dx + lmbda*inner(div(u), div(v))*dx
-        
-    L = inner(Constant((0, )*len(u)), v)*dx
+
+    if f is not None:
+        L = inner(f, v)*dx
+    else:
+        L = inner(Constant((0, )*len(u)), v)*dx
     # Neumann bcs
     ds = Measure('ds', domain=boundaries.mesh(), subdomain_data=boundaries)
     for tag, value in neumann_bcs.items():
