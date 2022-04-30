@@ -88,4 +88,4 @@ np.savez(path,
          interior_x=interior_x, interior_vals=interior_vals,
          boundary_x=boundary_x, boudnary_vals=boundary_vals)
 
-# This should be what is needed to learn a mappign NN(x) --> displacement@x
+# This should be what is needed to learn a mapping NN(x) --> displacement@x
