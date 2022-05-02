@@ -2,7 +2,7 @@ from nn_atlas.extensions.utils import check_bcs
 from dolfin import *
 
 
-def biharmonic_extension(V, boundaries, dirichlet_bcs, diffusion=Constant(1)):
+def biharmonic_extension(V, boundaries, dirichlet_bcs, diffusion=Constant(1), f=None):
     '''
     Given boundary displacement we extend to the entire domain by solving
 
@@ -25,8 +25,11 @@ def biharmonic_extension(V, boundaries, dirichlet_bcs, diffusion=Constant(1)):
          - inner(avg(div(grad(u))), jump(grad(v), n))*dS 
          - inner(jump(grad(u), n), avg(div(grad(v))))*dS 
          + alpha('+')/h_avg*inner(jump(grad(u),n), jump(grad(v),n))*dS)
-    
-    L = inner(Constant((0, )*len(u)), v)*dx
+
+    if f is not None:
+        L = inner(f, v)*dx
+    else:
+        L = inner(Constant((0, )*len(u)), v)*dx
     # Dirichlet ones
     bcs = [DirichletBC(V, value, boundaries, tag) for tag, value in dirichlet_bcs.items()]
 

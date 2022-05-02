@@ -1,4 +1,4 @@
-from nn_atlas.extensions import harmonic_extension, elastic_extension
+from nn_atlas.extensions import harmonic_extension, elastic_extension, biharmonic_extension
 from dolfin import *
 import numpy as np
 import pytest
@@ -82,11 +82,43 @@ def test_elastic(deg, mu=1, lmbda=1):
     return errors
 
 
+def test_biharmonic():
+    import sympy as sp
+    import ulfy
+
+    mesh = UnitSquareMesh(1, 1)
+    x, y = SpatialCoordinate(mesh)
+
+    u = sin(pi*x)*sin(pi*y)
+    f = div(grad(div(grad(u))))
+
+    u, f = ulfy.Expression(u, degree=5), ulfy.Expression(f, degree=5)
+    
+    hs, errors = [], []
+    for k in range(1, 7):
+        n = 2**k
+        mesh = UnitSquareMesh(n, n)
+
+        boundaries = MeshFunction('size_t', mesh, 1, 0)
+        DomainBoundary().mark(boundaries, 1)
+        
+        dirichlet_bcs = {1: u}
+        V = FunctionSpace(mesh, 'CG', 2)
+
+        uh = biharmonic_extension(V, boundaries, dirichlet_bcs=dirichlet_bcs, f=f)
+
+        errors.append(errornorm(u, uh, 'H1'))
+        hs.append(mesh.hmin())
+    rate, _ = np.polyfit(np.log(hs), np.log(errors), deg=1)
+
+    assert np.round(rate, 2) > 1.5
+    
+    return errors
 
 # --------------------------------------------------------------------
 
 if __name__ == '__main__':
 
-    print(test_elastic(deg=2))
+    print(test_biharmonic())
 
                 

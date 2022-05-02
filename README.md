@@ -7,3 +7,5 @@ to be installed in particular order
 2. ipython
 3. fenics
 4. matplotlib
+
+If you want to run tests [ulfy](https://github.com/MiroK/ulfy) is required.
