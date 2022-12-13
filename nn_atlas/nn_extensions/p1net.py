@@ -136,7 +136,6 @@ class ScalarP1FunctionSpace(nn.Module):
     def forward(self, x):
         # Build up "Vandermonde", then each column is what
         ndofs = len(self.lin.weight[0])
-        
         if self.basis_cache is None:
             bsize, npts  = x.shape[:2]
             basis_values = torch.zeros(bsize, npts, ndofs, dtype=x.dtype)
@@ -145,9 +144,8 @@ class ScalarP1FunctionSpace(nn.Module):
                 a = hat_function(x, support)
                 basis_values[..., col] = hat_function(x, support)
             self.basis_cache = basis_values
-            
-        out = self.lin(self.basis_cache).squeeze(2)
 
+        out = self.lin(self.basis_cache).squeeze(2)
         #  npts x ndofs
         # nvecs x npts x ndofs   .  weigths
         # nvecs x npts <---
