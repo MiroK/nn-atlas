@@ -185,7 +185,7 @@ if __name__ == '__main__':
     mine = p1(x).detach().numpy().flatten()    
     print('Time to second', timer.stop())
     true = np.array([f(xi) for xi in x.detach().numpy().reshape(-1, 2)])
-    print(np.linalg.norm(mine - true, np.inf))
+    print('Error', np.linalg.norm(mine - true, np.inf))
 
     y = torch.rand(1, 10, 2, dtype=torch.float64)
     y.requires_grad = True
@@ -195,23 +195,49 @@ if __name__ == '__main__':
     
     # # ---
 
-    # V = df.VectorFunctionSpace(mesh, 'CG', 1)
+    Vh = df.VectorFunctionSpace(mesh, 'CG', 1)
     
-    # p1 = VectorP1FunctionSpace(mesh)
-    # p1.double()
+    p1 = VectorP1FunctionSpace(mesh)
+    p1.double()
 
-    # f = df.Expression(('x[0] + x[1]', 'x[0] - 2*x[1]'), degree=1)
-    # coef = df.interpolate(f, V).vector().get_local()
-    # p1.set_from_coefficients(coef)
+    f = df.Expression(('x[0] + 3*x[1]', 'x[0] - 2*x[1]'), degree=1)
+    coef = df.interpolate(f, Vh).vector().get_local()
+    p1.set_from_coefficients(coef)
     
-    # x = torch.rand(1, 10000, 2, dtype=torch.float64)
+    x = torch.rand(1, 10000, 2, dtype=torch.float64)
 
-    # timer = df.Timer('first')
-    # mine = p1(x).detach().numpy().flatten()
-    # print('Time to first', timer.stop())
+    timer = df.Timer('first')
+    mine = p1(x).detach().numpy().flatten()
+    print('Time to first', timer.stop())
 
-    # timer = df.Timer('second')
-    # mine = p1(x).detach().numpy().flatten()    
-    # print('Time to second', timer.stop())
-    # true = np.array([f(xi) for xi in x.detach().numpy().reshape(-1, 2)]).flatten()
-    # print(np.linalg.norm(mine - true, np.inf))
+    timer = df.Timer('second')
+    mine = p1(x).detach().numpy().flatten()    
+    print('Time to second', timer.stop())
+    true = np.array([f(xi) for xi in x.detach().numpy().reshape(-1, 2)]).flatten()
+    print(np.linalg.norm(mine - true, np.inf), 'Error')
+
+    # Attempt at plot
+    x_ = torch.linspace(0, 1, 100, dtype=x.dtype)
+    y_ = torch.linspace(0, 1, 100, dtype=x.dtype)
+    X, Y = torch.meshgrid(x_, y_)
+
+    grid_points = torch.column_stack([torch.ravel(X), torch.ravel(Y)]).reshape(1, -1, 2)
+
+    values = p1(grid_points)
+    U, V = values[..., 0], values[..., 1]
+    U = U.reshape(X.shape)
+    V = V.reshape(X.shape)
+
+    import matplotlib.pyplot as plt
+    
+    fig, ax = plt.subplots(1, 2)
+    mappable = df.common.plotting.mplot_function(ax[0], df.interpolate(f, Vh))
+    plt.colorbar(mappable, ax=ax[0])
+
+    stride = 10
+    X_, Y_, U_, V_ = (t.detach().numpy()[::stride, ::stride] for t in (X, Y, U, V))
+
+    C_ = np.sqrt(U_**2 + V_**2)
+    mappable = ax[1].quiver(X_, Y_, U_, V_, C_)
+    plt.colorbar(mappable, ax=ax[1])
+
